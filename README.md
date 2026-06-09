@@ -10,6 +10,112 @@ Deep Linking é a capacidade de abrir um app mobile em uma tela específica a pa
 
 ---
 
+## Arquitetura Geral
+
+O deep linking acontece em **3 fases**: o link é disparado fora do app, o sistema operacional decide o que fazer com ele, e por fim o app abre a tela certa.
+
+```mermaid
+flowchart TD
+    Start([Usuário clica em um link])
+
+    subgraph F1[" 1 — Fora do app "]
+        Start --> Tipo{Que tipo de link?}
+        Tipo -->|"myapp://product/42<br/>(Custom Scheme)"| Reg["SO verifica quem<br/>registrou o scheme"]
+        Tipo -->|"https://site.com/product/42<br/>(Universal Link)"| Ver["SO verifica a associação<br/>domínio ↔ app"]
+    end
+
+    subgraph F2[" 2 — Decisão do Sistema Operacional "]
+        Reg --> Inst1{App instalado?}
+        Ver --> Inst2{App instalado?}
+        Inst1 -->|Não| Nada["❌ Nada acontece"]
+        Inst2 -->|Não| Browser["🌐 Abre no navegador"]
+        Inst1 -->|Sim| Abre
+        Inst2 -->|Sim| Abre["SO entrega a URL ao app"]
+    end
+
+    subgraph F3[" 3 — Dentro do app "]
+        Abre --> Router["Expo Router lê a URL<br/>e encontra a rota"]
+        Router --> Tela([Abre a tela /product/42])
+    end
+```
+
+> **Por que duas verificações diferentes na fase 2?** O *custom scheme* (`myapp://`) só checa qual app registrou aquele nome — por isso é frágil (qualquer app pode registrar). Já o *universal link* (`https://`) exige que o domínio comprove ser dono do app, e por isso consegue cair no navegador como fallback quando o app não está instalado.
+
+---
+
+## Fluxo de Verificação — Universal Links
+
+```mermaid
+sequenceDiagram
+    participant U as Usuário
+    participant SO as Sistema Operacional
+    participant S as Servidor
+    participant App as App
+
+    Note over SO,S: Na instalação do app
+    SO->>S: GET /.well-known/assetlinks.json (Android)<br/>GET /.well-known/apple-app-site-association (iOS)
+    S-->>SO: Retorna JSON com fingerprint/Team ID
+    SO->>SO: Verifica se o app corresponde ao domínio
+    SO->>SO: Registra associação domínio ↔ app
+
+    Note over U,App: Quando o usuário clica no link
+    U->>SO: Clica em https://site.com/product/42
+    SO->>SO: Consulta associação registrada
+    SO->>App: Abre app com a URL
+    App->>App: Router navega para /product/42
+```
+
+---
+
+## Custom Scheme vs Universal Links
+
+```mermaid
+flowchart LR
+    subgraph CS [Custom Scheme]
+        direction TB
+        cs1["myapp://product/42"]
+        cs2["Registrado no<br/>AndroidManifest / Info.plist"]
+        cs3["App instalado → abre<br/>App ausente → nada"]
+        cs1 --> cs2 --> cs3
+    end
+
+    subgraph UL [Universal Links / App Links]
+        direction TB
+        ul1["https://site.com/product/42"]
+        ul2["Verificado via<br/>assetlinks.json / AASA"]
+        ul3["App instalado → abre<br/>App ausente → browser"]
+        ul1 --> ul2 --> ul3
+    end
+```
+
+---
+
+## Expo Router — Mapeamento de URLs
+
+```mermaid
+flowchart LR
+    subgraph URL
+        u1[myapp:///]
+        u2[myapp:///explore]
+        u3[myapp:///product/42]
+        u4[myapp:///modal]
+    end
+
+    subgraph Arquivos em app/
+        f1["(tabs)/index.tsx"]
+        f2["(tabs)/explore.tsx"]
+        f3["product/[id].tsx<br/>← id = 42"]
+        f4["modal.tsx"]
+    end
+
+    u1 --> f1
+    u2 --> f2
+    u3 --> f3
+    u4 --> f4
+```
+
+---
+
 ## Tipos de Deep Link
 
 ### 1. Custom URL Scheme
