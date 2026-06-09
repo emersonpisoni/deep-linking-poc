@@ -1,68 +1,62 @@
-# Deep Linking — Estudo e POC
+# Deep Linking 
 
-Projeto de estudo sobre Deep Linking em React Native com Expo Router.
-
----
-
-## O que é Deep Linking?
-
-Deep Linking é a capacidade de abrir um app mobile em uma tela específica a partir de uma URL externa — seja por outro app, notificação, e-mail, SMS ou browser.
+Deep Linking is the ability to open a mobile app on a specific screen from an external URL — whether from another app, a notification, an email, an SMS, or a browser.
 
 ---
 
-## Arquitetura Geral
+## General Architecture
 
-O deep linking acontece em **3 fases**: o link é disparado fora do app, o sistema operacional decide o que fazer com ele, e por fim o app abre a tela certa.
+Deep linking happens in **3 phases**: the link is triggered outside the app, the operating system decides what to do with it, and finally the app opens the right screen.
 
 ```mermaid
 flowchart TD
-    Start([Usuário clica em um link])
+    Start([User taps a link])
 
-    subgraph F1[" 1 — Fora do app "]
-        Start --> Tipo{Que tipo de link?}
-        Tipo -->|"myapp://product/42<br/>(Custom Scheme)"| Reg["SO verifica quem<br/>registrou o scheme"]
-        Tipo -->|"https://site.com/product/42<br/>(Universal Link)"| Ver["SO verifica a associação<br/>domínio ↔ app"]
+    subgraph F1[" 1 — Outside the app "]
+        Start --> Tipo{What kind of link?}
+        Tipo -->|"myapp://product/42<br/>(Custom Scheme)"| Reg["OS checks which app<br/>registered the scheme"]
+        Tipo -->|"https://site.com/product/42<br/>(Universal Link)"| Ver["OS checks the<br/>domain ↔ app association"]
     end
 
-    subgraph F2[" 2 — Decisão do Sistema Operacional "]
-        Reg --> Inst1{App instalado?}
-        Ver --> Inst2{App instalado?}
-        Inst1 -->|Não| Nada["❌ Nada acontece"]
-        Inst2 -->|Não| Browser["🌐 Abre no navegador"]
-        Inst1 -->|Sim| Abre
-        Inst2 -->|Sim| Abre["SO entrega a URL ao app"]
+    subgraph F2[" 2 — Operating System decision "]
+        Reg --> Inst1{App installed?}
+        Ver --> Inst2{App installed?}
+        Inst1 -->|No| Nada["❌ Nothing happens"]
+        Inst2 -->|No| Browser["🌐 Opens in the browser"]
+        Inst1 -->|Yes| Abre
+        Inst2 -->|Yes| Abre["OS hands the URL to the app"]
     end
 
-    subgraph F3[" 3 — Dentro do app "]
-        Abre --> Router["Expo Router lê a URL<br/>e encontra a rota"]
-        Router --> Tela([Abre a tela /product/42])
+    subgraph F3[" 3 — Inside the app "]
+        Abre --> Router["Expo Router reads the URL<br/>and finds the route"]
+        Router --> Tela([Opens the /product/42 screen])
     end
 ```
 
-> **Por que duas verificações diferentes na fase 2?** O *custom scheme* (`myapp://`) só checa qual app registrou aquele nome — por isso é frágil (qualquer app pode registrar). Já o *universal link* (`https://`) exige que o domínio comprove ser dono do app, e por isso consegue cair no navegador como fallback quando o app não está instalado.
+> **Why two different checks in phase 2?** A *custom scheme* (`myapp://`) only checks which app registered that name — which makes it fragile (any app can register it). A *universal link* (`https://`), on the other hand, requires the domain to prove it owns the app, which is why it can fall back to the browser when the app isn't installed.
 
 ---
 
-## Fluxo de Verificação — Universal Links
+## Verification Flow — Universal Links
 
 ```mermaid
 sequenceDiagram
-    participant U as Usuário
-    participant SO as Sistema Operacional
-    participant S as Servidor
+    participant U as User
+    participant OS as Operating System
+    participant S as Server
     participant App as App
 
-    Note over SO,S: Na instalação do app
-    SO->>S: GET /.well-known/assetlinks.json (Android)<br/>GET /.well-known/apple-app-site-association (iOS)
-    S-->>SO: Retorna JSON com fingerprint/Team ID
-    SO->>SO: Verifica se o app corresponde ao domínio
-    SO->>SO: Registra associação domínio ↔ app
+    Note over OS,S: On app install
+    OS->>S: GET /.well-known/assetlinks.json (Android)<br/>GET /.well-known/apple-app-site-association (iOS)
+    S-->>OS: Returns JSON with fingerprint/Team ID
+    OS->>OS: Verifies the app matches the domain
+    OS->>OS: Registers domain ↔ app association
 
-    Note over U,App: Quando o usuário clica no link
-    U->>SO: Clica em https://site.com/product/42
-    SO->>SO: Consulta associação registrada
-    SO->>App: Abre app com a URL
-    App->>App: Router navega para /product/42
+    Note over U,App: When the user taps the link
+    U->>OS: Taps https://site.com/product/42
+    OS->>OS: Looks up the registered association
+    OS->>App: Opens app with the URL
+    App->>App: Router navigates to /product/42
 ```
 
 ---
@@ -74,23 +68,23 @@ flowchart LR
     subgraph CS [Custom Scheme]
         direction TB
         cs1["myapp://product/42"]
-        cs2["Registrado no<br/>AndroidManifest / Info.plist"]
-        cs3["App instalado → abre<br/>App ausente → nada"]
+        cs2["Registered in<br/>AndroidManifest / Info.plist"]
+        cs3["App installed → opens<br/>App missing → nothing"]
         cs1 --> cs2 --> cs3
     end
 
     subgraph UL [Universal Links / App Links]
         direction TB
         ul1["https://site.com/product/42"]
-        ul2["Verificado via<br/>assetlinks.json / AASA"]
-        ul3["App instalado → abre<br/>App ausente → browser"]
+        ul2["Verified via<br/>assetlinks.json / AASA"]
+        ul3["App installed → opens<br/>App missing → browser"]
         ul1 --> ul2 --> ul3
     end
 ```
 
 ---
 
-## Expo Router — Mapeamento de URLs
+## Expo Router — URL Mapping
 
 ```mermaid
 flowchart LR
@@ -101,7 +95,7 @@ flowchart LR
         u4[myapp:///modal]
     end
 
-    subgraph Arquivos em app/
+    subgraph Files in app/
         f1["(tabs)/index.tsx"]
         f2["(tabs)/explore.tsx"]
         f3["product/[id].tsx<br/>← id = 42"]
@@ -116,7 +110,7 @@ flowchart LR
 
 ---
 
-## Tipos de Deep Link
+## Types of Deep Link
 
 ### 1. Custom URL Scheme
 
@@ -124,25 +118,25 @@ flowchart LR
 myapp://product/42
 ```
 
-- Simples de configurar
-- Funciona sem domínio próprio
-- Não abre no browser se o app não estiver instalado
-- **Problema:** qualquer app pode registrar o mesmo scheme — sem garantia de exclusividade
+- Simple to set up
+- Works without owning a domain
+- Doesn't open in the browser if the app isn't installed
+- **Problem:** any app can register the same scheme — no exclusivity guarantee
 
 ### 2. Universal Links (iOS) / App Links (Android)
 
 ```
-https://meudomain.com/product/42
+https://mydomain.com/product/42
 ```
 
-- Usa HTTPS — exclusivo para quem controla o domínio
-- Abre o app se instalado, senão cai no browser (fallback automático)
-- Requer arquivo de verificação hospedado no servidor
-- Mais seguro e recomendado para produção
+- Uses HTTPS — exclusive to whoever controls the domain
+- Opens the app if installed, otherwise falls back to the browser (automatic fallback)
+- Requires a verification file hosted on the server
+- More secure and recommended for production
 
 ---
 
-## Configuração — Custom URL Scheme
+## Configuration — Custom URL Scheme
 
 ### Expo (`app.json`)
 
@@ -160,28 +154,28 @@ https://meudomain.com/product/42
       ]
     },
     "ios": {
-      "bundleIdentifier": "com.empresa.app"
+      "bundleIdentifier": "com.company.app"
     }
   }
 }
 ```
 
-O Expo Config Plugin gera automaticamente os arquivos nativos a partir dessa configuração durante o build.
+The Expo Config Plugin automatically generates the native files from this configuration during the build.
 
-### React Native puro — Android
+### Bare React Native — Android
 
-Edite `android/app/src/main/AndroidManifest.xml` e adicione um `<intent-filter>` dentro da `<activity>`:
+Edit `android/app/src/main/AndroidManifest.xml` and add an `<intent-filter>` inside the `<activity>`:
 
 ```xml
 <activity android:name=".MainActivity" ...>
 
-  <!-- intent-filter existente para abrir o app -->
+  <!-- existing intent-filter that launches the app -->
   <intent-filter>
     <action android:name="android.intent.action.MAIN" />
     <category android:name="android.intent.category.LAUNCHER" />
   </intent-filter>
 
-  <!-- intent-filter para custom scheme -->
+  <!-- intent-filter for the custom scheme -->
   <intent-filter>
     <action android:name="android.intent.action.VIEW" />
     <category android:name="android.intent.category.DEFAULT" />
@@ -192,16 +186,16 @@ Edite `android/app/src/main/AndroidManifest.xml` e adicione um `<intent-filter>`
 </activity>
 ```
 
-### React Native puro — iOS
+### Bare React Native — iOS
 
-Edite `ios/[NomeDoApp]/Info.plist` e adicione:
+Edit `ios/[AppName]/Info.plist` and add:
 
 ```xml
 <key>CFBundleURLTypes</key>
 <array>
   <dict>
     <key>CFBundleURLName</key>
-    <string>com.empresa.app</string>
+    <string>com.company.app</string>
     <key>CFBundleURLSchemes</key>
     <array>
       <string>myapp</string>
@@ -212,45 +206,45 @@ Edite `ios/[NomeDoApp]/Info.plist` e adicione:
 
 ---
 
-## Configuração — Universal Links (iOS) / App Links (Android)
+## Configuration — Universal Links (iOS) / App Links (Android)
 
-### Passo 1 — Arquivo no servidor
+### Step 1 — File on the server
 
-**Android** — hospede em `https://meudomain.com/.well-known/assetlinks.json`:
+**Android** — host it at `https://mydomain.com/.well-known/assetlinks.json`:
 
 ```json
 [{
   "relation": ["delegate_permission/common.handle_all_urls"],
   "target": {
     "namespace": "android_app",
-    "package_name": "com.empresa.app",
+    "package_name": "com.company.app",
     "sha256_cert_fingerprints": ["AA:BB:CC:..."]
   }
 }]
 ```
 
-> O `sha256_cert_fingerprints` é obtido com:
+> The `sha256_cert_fingerprints` is obtained with:
 > ```bash
 > keytool -list -v -keystore release.keystore
 > ```
 
-**iOS** — hospede em `https://meudomain.com/.well-known/apple-app-site-association`:
+**iOS** — host it at `https://mydomain.com/.well-known/apple-app-site-association`:
 
 ```json
 {
   "applinks": {
     "apps": [],
     "details": [{
-      "appID": "TEAMID.com.empresa.app",
+      "appID": "TEAMID.com.company.app",
       "paths": ["/product/*", "/modal"]
     }]
   }
 }
 ```
 
-> O arquivo deve ser servido com `Content-Type: application/json` e sem redirecionamentos.
+> The file must be served with `Content-Type: application/json` and without redirects.
 
-### Passo 2 — Configuração no app
+### Step 2 — App configuration
 
 **Expo (`app.json`):**
 
@@ -265,7 +259,7 @@ Edite `ios/[NomeDoApp]/Info.plist` e adicione:
           "data": [
             {
               "scheme": "https",
-              "host": "meudomain.com",
+              "host": "mydomain.com",
               "pathPrefix": "/product"
             }
           ],
@@ -274,41 +268,41 @@ Edite `ios/[NomeDoApp]/Info.plist` e adicione:
       ]
     },
     "ios": {
-      "associatedDomains": ["applinks:meudomain.com"]
+      "associatedDomains": ["applinks:mydomain.com"]
     }
   }
 }
 ```
 
-**React Native puro — Android (`AndroidManifest.xml`):**
+**Bare React Native — Android (`AndroidManifest.xml`):**
 
 ```xml
 <intent-filter android:autoVerify="true">
   <action android:name="android.intent.action.VIEW" />
   <category android:name="android.intent.category.DEFAULT" />
   <category android:name="android.intent.category.BROWSABLE" />
-  <data android:scheme="https" android:host="meudomain.com" android:pathPrefix="/product" />
+  <data android:scheme="https" android:host="mydomain.com" android:pathPrefix="/product" />
 </intent-filter>
 ```
 
-**React Native puro — iOS (`Entitlements.plist`):**
+**Bare React Native — iOS (`Entitlements.plist`):**
 
 ```xml
 <key>com.apple.developer.associated-domains</key>
 <array>
-  <string>applinks:meudomain.com</string>
+  <string>applinks:mydomain.com</string>
 </array>
 ```
 
 ---
 
-## Roteamento com Expo Router
+## Routing with Expo Router
 
-Com Expo Router, **não existe arquivo central de rotas**. O mapeamento é automático pela estrutura de arquivos:
+With Expo Router, **there is no central routes file**. The mapping is automatic, based on the file structure:
 
 ```
 app/
-  _layout.tsx           → layout raiz
+  _layout.tsx           → root layout
   (tabs)/
     index.tsx           → myapp:///
     explore.tsx         → myapp:///explore
@@ -317,7 +311,7 @@ app/
   modal.tsx             → myapp:///modal
 ```
 
-### Parâmetros dinâmicos
+### Dynamic parameters
 
 ```tsx
 // app/product/[id].tsx
@@ -325,18 +319,18 @@ import { useLocalSearchParams } from 'expo-router';
 
 export default function ProductScreen() {
   const { id } = useLocalSearchParams();
-  return <Text>Produto: {id}</Text>;
+  return <Text>Product: {id}</Text>;
 }
 ```
 
-### Roteamento com React Navigation (sem Expo Router)
+### Routing with React Navigation (without Expo Router)
 
 ```tsx
 import { NavigationContainer } from '@react-navigation/native';
 import * as Linking from 'expo-linking';
 
 const linking = {
-  prefixes: [Linking.createURL('/'), 'https://meudomain.com'],
+  prefixes: [Linking.createURL('/'), 'https://mydomain.com'],
   config: {
     screens: {
       Home: '',
@@ -357,31 +351,31 @@ export default function App() {
 
 ---
 
-## Receber links no app
+## Receiving links in the app
 
-### App estava fechada (cold start)
+### App was closed (cold start)
 
 ```tsx
 import * as Linking from 'expo-linking';
 
 const url = await Linking.getInitialURL();
 if (url) {
-  // processar e navegar
+  // process and navigate
 }
 ```
 
-### App estava em background (warm start)
+### App was in the background (warm start)
 
 ```tsx
 useEffect(() => {
   const subscription = Linking.addEventListener('url', ({ url }) => {
-    // processar e navegar
+    // process and navigate
   });
   return () => subscription.remove();
 }, []);
 ```
 
-> Com Expo Router isso é tratado automaticamente — o router intercepta a URL e navega para a rota correspondente sem código extra.
+> With Expo Router this is handled automatically — the router intercepts the URL and navigates to the matching route without extra code.
 
 ---
 
@@ -389,20 +383,20 @@ useEffect(() => {
 
 | | Expo Go | Development Build |
 |---|---|---|
-| Custom scheme (`myapp://`) | Não funciona | Funciona |
-| Universal Links / App Links | Não funciona | Funciona |
-| Navegação interna (`router.push`) | Funciona | Funciona |
-| Ideal para | Prototipagem rápida | Testar deep links reais |
+| Custom scheme (`myapp://`) | Doesn't work | Works |
+| Universal Links / App Links | Doesn't work | Works |
+| Internal navigation (`router.push`) | Works | Works |
+| Best for | Quick prototyping | Testing real deep links |
 
-Para buildar o development build localmente:
+To build the development build locally:
 
 ```bash
-# Requer Android Studio / Xcode instalados
-npm run android   # builda e instala no emulador/dispositivo
+# Requires Android Studio / Xcode installed
+npm run android   # builds and installs on the emulator/device
 npm run ios
 ```
 
-Para buildar na nuvem via EAS (sem precisar do Android Studio):
+To build in the cloud via EAS (no Android Studio needed):
 
 ```bash
 npx eas build --profile development --platform android
@@ -410,15 +404,15 @@ npx eas build --profile development --platform android
 
 ---
 
-## Testando Deep Links
+## Testing Deep Links
 
 ### Via terminal
 
 ```bash
-# Android — emulador ou dispositivo via USB
+# Android — emulator or device over USB
 adb shell am start -W -a android.intent.action.VIEW -d "myapp:///product/42"
 
-# iOS — simulador
+# iOS — simulator
 xcrun simctl openurl booted "myapp:///product/42"
 ```
 
@@ -429,64 +423,64 @@ npx uri-scheme open "myapp:///product/42" --android
 npx uri-scheme open "myapp:///product/42" --ios
 ```
 
-### No próprio app
+### Inside the app itself
 
 ```tsx
 import { Linking } from 'react-native';
 
 <Button
-  title="Testar deeplink"
+  title="Test deeplink"
   onPress={() => Linking.openURL('myapp:///product/42')}
 />
 ```
 
-### Configurar adb no PATH (macOS)
+### Add adb to the PATH (macOS)
 
 ```bash
-# Adicione no ~/.zshrc
+# Add to ~/.zshrc
 export ANDROID_HOME=$HOME/Library/Android/sdk
 export PATH=$PATH:$ANDROID_HOME/platform-tools
 ```
 
 ---
 
-## Arquivos nativos gerados pelo Expo
+## Native files generated by Expo
 
-O Expo lê o `app.json` e gera os arquivos nativos automaticamente durante o build:
+Expo reads `app.json` and generates the native files automatically during the build:
 
-| Configuração | Arquivo gerado |
+| Configuration | Generated file |
 |---|---|
 | `scheme` + `intentFilters` (Android) | `android/app/src/main/AndroidManifest.xml` |
 | `scheme` (iOS) | `ios/[App]/Info.plist` |
 | `associatedDomains` (iOS) | `ios/[App]/[App].entitlements` |
 
-Em projetos React Native puro (sem Expo), esses arquivos são editados manualmente.
+In bare React Native projects (without Expo), these files are edited manually.
 
 ---
 
-## Edge Cases importantes
+## Important Edge Cases
 
-- **App não instalada:** o link não abre com custom scheme — use Universal/App Links para ter fallback no browser
-- **Link chega antes da navegação estar pronta:** enfileire a URL e processe após o mount do navigator
-- **Autenticação:** redirecione para o login guardando o destino original, e após autenticar navegue para ele
-- **Android — `autoVerify`:** sem `autoVerify: true` no intent filter, o Android trata o link como custom scheme e exibe o seletor de apps
-- **iOS — HTTPS obrigatório:** o arquivo `apple-app-site-association` deve estar em HTTPS sem redirecionamentos
+- **App not installed:** the link won't open with a custom scheme — use Universal/App Links to get a browser fallback
+- **Link arrives before navigation is ready:** queue the URL and process it after the navigator mounts
+- **Authentication:** redirect to the login screen while saving the original destination, then navigate to it after authenticating
+- **Android — `autoVerify`:** without `autoVerify: true` in the intent filter, Android treats the link as a custom scheme and shows the app chooser
+- **iOS — HTTPS required:** the `apple-app-site-association` file must be served over HTTPS with no redirects
 
 ---
 
-## Estrutura deste projeto
+## Project Structure
 
 ```
 app/
   (tabs)/
-    index.tsx         — home com botões de teste de deeplink
-    explore.tsx       — aba explorar
+    index.tsx         — home with deeplink test buttons
+    explore.tsx       — explore tab
   product/
-    [id].tsx          — tela de produto, recebe ID via URL
-  modal.tsx           — modal acessível via deeplink
-  _layout.tsx         — layout raiz com Stack navigator
+    [id].tsx          — product screen, receives ID via URL
+  modal.tsx           — modal reachable via deeplink
+  _layout.tsx         — root layout with Stack navigator
 android/
   app/src/main/
-    AndroidManifest.xml  — intent-filters gerados pelo Expo build
-app.json              — scheme e intentFilters configurados
+    AndroidManifest.xml  — intent-filters generated by the Expo build
+app.json              — scheme and intentFilters configured
 ```
